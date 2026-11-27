@@ -482,7 +482,8 @@ SET precatorio_id = EXCLUDED.precatorio_id,
     pago_em       = EXCLUDED.pago_em,
     atualizado_em = EXCLUDED.atualizado_em,
     arquivo_id    = EXCLUDED.arquivo_id
-WHERE EXCLUDED.atualizado_em > pagamento.atualizado_em;
+WHERE pagamento.atualizado_em IS NULL  -- linha gravada antes da migração
+   OR EXCLUDED.atualizado_em > pagamento.atualizado_em;
 ```
 
 **6. Quarentena (problema 2).** Todo evento recusado fica registrado, com o conteúdo original e o motivo, até alguém decidir o que fazer.
@@ -544,12 +545,15 @@ WITH ultima_lista AS (
         WHERE tipo = 'tribunal' AND status = 'processado'
     )
 )
+-- Face e ente só são comparados quando o processo está dos dois lados;
+-- senão a comparação contra NULL marcaria uma divergência falsa.
 SELECT
     COALESCE(t.numero_processo, p.numero_processo) AS numero_processo,
     p.id IS NULL                                    AS so_no_tribunal,
     t.numero_processo IS NULL                       AS so_no_sistema,
-    t.valor_face IS DISTINCT FROM p.valor_face      AS valor_face_diferente,
-    t.ente_id    IS DISTINCT FROM p.ente_id         AS ente_diferente,
+    COALESCE(t.valor_face <> p.valor_face, false)   AS valor_face_diferente,
+    COALESCE(t.ente_id IS DISTINCT FROM p.ente_id AND p.id IS NOT NULL
+             AND t.numero_processo IS NOT NULL, false) AS ente_diferente,
     t.valor_face AS face_tribunal,
     p.valor_face AS face_sistema,
     t.ente_id    AS ente_tribunal,
