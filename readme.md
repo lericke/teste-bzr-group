@@ -56,6 +56,33 @@ Os testes cobrem as regras de maior risco:
 - **quarentena:** os eventos que não podem ser aproveitados;
 - **arquivos reais do case:** que os originais não mudam, que rodar duas vezes gera exatamente a mesma saída e quais são os totais de cada precatório.
 
+## Como testar o SQL
+
+A migração foi testada num PostgreSQL 16 em Docker, sobre o `schema.sql` original:
+
+```bash
+docker run -d --rm --name pg-case -e POSTGRES_PASSWORD=x postgres:16
+docker exec -i pg-case psql -U postgres -v ON_ERROR_STOP=1 < case-candidato/schema.sql
+docker exec -i pg-case psql -U postgres -v ON_ERROR_STOP=1 < prevencao/teste/1_dados_antes.sql
+docker exec -i pg-case psql -U postgres -v ON_ERROR_STOP=1 < prevencao/migracao.sql
+docker exec -i pg-case psql -U postgres < prevencao/teste/2_comportamento.sql
+docker stop pg-case
+```
+
+O script `2_comportamento.sql` confere:
+
+- a conversão de fuso;
+- o prazo dos seis precatórios;
+- as restrições, recusando processo com máscara e `evento_id` repetido;
+- o upsert: reimportar não duplica, e uma versão antiga não sobrescreve a nova;
+- o estorno abatendo no total pago;
+- a quarentena;
+- a conciliação, que aponta só as quatro divergências reais.
+
+Os erros que aparecem nos passos 3, 4 e 8 são esperados: são as restrições recusando dados inválidos.
+
+Também foi testado o caso de um banco que já tem `evento_id` duplicado. A migração para com erro e não aplica nada.
+
 ## Decisões principais
 
 - **O que depende do tribunal não é decidido pelo programa.** Isso vale para o estorno do `ev-007`, o valor negativo do `ev-009` e as divergências de valor de face, de ente e de fuso. Esses casos ficam com status `em_duvida` e fora do total confirmado. O relatório mostra o total com e sem eles.
@@ -80,7 +107,12 @@ Como conferi o que a IA produziu:
 - **Testes que falham quando a regra quebra.** Troquei de propósito o `<=` por `<` na regra de 2 de abril, que é o erro provável do sistema atual. Três testes falharam, e o código foi restaurado.
 - **Os arquivos do case.** Conferi pelo hash que o repositório guarda os arquivos idênticos aos recebidos. Isso mostrou que o Git estava convertendo as quebras de linha, e o problema foi corrigido.
 
+- **SQL executado, não só revisado.** Rodar a migração num PostgreSQL revelou dois defeitos que a revisão não tinha pegado:
+  - o upsert ignorava, em silêncio, as linhas gravadas antes da migração, porque a comparação com `atualizado_em` nulo nunca é verdadeira;
+  - a conciliação marcava divergências falsas de face e de ente para processos que só existem de um lado.
+
+  Os dois foram corrigidos e testados de novo.
+
 O que ainda não foi verificado:
 
-- **O SQL** foi revisado, mas não foi executado num PostgreSQL.
 - **A versão mínima do Python:** o programa foi testado no Python 3.13. Ele evita recursos que não existem no 3.10, mas não rodou no 3.10.
