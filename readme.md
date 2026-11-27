@@ -112,7 +112,4 @@ Como conferi o que a IA produziu:
   - a conciliação marcava divergências falsas de face e de ente para processos que só existem de um lado.
 
   Os dois foram corrigidos e testados de novo.
-
-O que ainda não foi verificado:
-
-- **A versão mínima do Python:** o programa foi testado no Python 3.13. Ele evita recursos que não existem no 3.10, mas não rodou no 3.10.
+- **Versões do Python e clone limpo.** Os testes rodam no Python 3.13 (Windows) e no 3.10 (imagem `python:3.10-slim` no Docker). Os dois geram a mesma saída que está em `saida/`. Também conferi num clone novo do GitHub que os arquivos do case chegam idênticos aos originais.
