@@ -10,7 +10,7 @@
 2. [Como os problemas se ligam](#como-os-problemas-se-ligam): quais são causa e quais são consequência.
 3. [Visão por precatório](#visão-por-precatório): o mesmo processo nas quatro fontes, lado a lado.
 4. [Problemas](#problemas): o detalhe de cada um, sempre com **Evidência**, **Impacto** e **Causa ou consequência**.
-5. [Prevenção](#prevenção): o que mudar no processo, no script de importação e no banco, com o SQL.
+5. [Prevenção](#prevenção): o que mudar no processo e no banco, com o SQL, e uma proposta de como a importação deveria funcionar.
 6. [Dúvidas](#dúvidas): o que perguntar ao tribunal, à operação e a quem mantém o sistema antes de pôr a limpeza em produção.
 7. [Texto bruto](#texto-bruto): as anotações originais.
 
@@ -19,6 +19,13 @@
 - Linhas citadas são as do arquivo original. Em `pagamentos.json`, o intervalo de um evento vai da linha do `evento_id` à do `atualizado_em`. Quando o problema está num campo, a linha do campo é citada à parte.
 - "Passo N" é o passo do fluxo operacional em `ENUNCIADO.md`.
 - Gravidade: **Crítica** distorce todos os números ou a priorização inteira; **Alta** distorce um precatório inteiro ou um valor grande; **Média** afeta um registro ou depende de como o script lê; **Baixa** não muda valor ou ainda precisa de confirmação.
+
+**Limite da análise: o script de importação não foi fornecido.** O case não inclui o código do script que importa o `pagamentos.json`, nem o código que calcula o prazo ou gera o `hub.csv`. Tudo o que este documento diz sobre o script vem de duas fontes indiretas:
+
+- **o que o enunciado descreve:** o script soma cada valor ao total pago (Passo 2), é rodado de novo com o mesmo arquivo quando falha (Passo 2) e ignora, sem aviso, o evento que não consegue importar (Passo 5);
+- **o que o `schema.sql` permite:** qualquer script que grave nessas tabelas tem os eventos recusados pelas restrições do banco, seja qual for o código.
+
+Quando um impacto depende de como o script foi escrito (por exemplo, como ele converte `"2.500,50"` ou procura o precatório), o texto diz isso e trata as alternativas como possibilidades. Pelo mesmo motivo, a parte da importação na [Prevenção](#prevenção) não é uma lista de alterações sobre um código existente. É uma proposta de como o processo de importação deveria funcionar. As perguntas sobre o código atual estão nas dúvidas 22 e 23.
 
 **Uso de IA.** A primeira versão (só `pagamentos.json`) foi formatada com IA a partir das anotações brutas, que estão no fim do documento. Nesta revisão, com apoio de IA, foram corrigidos os números de linha, incluído o `ev-004` (que estava nas notas de trabalho, mas tinha ficado de fora) e estendida a análise aos demais arquivos. Cada evidência foi conferida contra o arquivo original. As seções de Prevenção e Dúvidas também foram escritas com apoio de IA, a partir do diagnóstico.
 
@@ -94,12 +101,15 @@ Em `apresentacoes.json`, as datas estão nas linhas 4, 8, 12, 16, 20 e 24, na or
 **Evidência.**
 
 - Passo 5: "Quando um evento não pode ser importado, o script ignora e segue. Ninguém é avisado."
-- `schema.sql` recusa, por construção, vários eventos do arquivo:
+- **Recusados com certeza, pelo `schema.sql`,** seja qual for o script:
   - linha 13, `valor NUMERIC(15,2) NOT NULL CHECK (valor > 0)`: recusa o `ev-004` (nulo) e o `ev-009` (-200);
-  - linha 10, `precatorio_id BIGINT NOT NULL REFERENCES precatorio (id)`: recusa o `ev-010` (processo vazio) e qualquer evento cujo processo não seja encontrado, como o `ev-005` (sem máscara), dependendo de como o script procura o precatório.
-- O `ev-002` (valor `"2.500,50"`, data `10/04/2025`) também cai aqui se a conversão falhar.
+  - linha 10, `precatorio_id BIGINT NOT NULL REFERENCES precatorio (id)`: recusa o `ev-010` (processo vazio), porque não há precatório para associar.
+- **Recusados ou não, dependendo do script** (que não foi fornecido):
+  - `ev-005` (processo sem máscara): depende de o script procurar o precatório pelo texto ou pelos dígitos;
+  - `ev-002` (valor `"2.500,50"`, data `10/04/2025`): depende de como o script converte valor e data;
+  - `ev-007` (`estorno`): o banco aceita o tipo, mas o script pode filtrar só `pagamento`.
 
-**Impacto.** Os valores que podem sumir sem rastro neste arquivo são: 2.500,50 (`ev-002`), 1.200 (`ev-005`), 200 (`ev-009`), 750 (`ev-010`) e um valor desconhecido (`ev-004`). O total pago do sistema fica menor que o do tribunal, e ninguém sabe dizer quais eventos explicam a diferença. É exatamente o sintoma relatado pela operação.
+**Impacto.** Somem com certeza 200 (`ev-009`), 750 (`ev-010`) e um valor desconhecido (`ev-004`). Podem sumir também 2.500,50 (`ev-002`), 1.200 (`ev-005`) e o estorno de 5.000 (`ev-007`), conforme o script. O total pago do sistema fica menor que o do tribunal, e ninguém sabe dizer quais eventos explicam a diferença. É exatamente o sintoma relatado pela operação.
 
 **Causa ou consequência.** Causa raiz. Transforma os defeitos de dado dos problemas 7, 11, 12, 13, 14, 15 e 16 em dinheiro faltando sem explicação.
 
@@ -114,7 +124,7 @@ Em `apresentacoes.json`, as datas estão nas linhas 4, 8, 12, 16, 20 e 24, na or
 
 **Impacto.** A equipe usa o prazo para priorizar a carteira (Passo 4). Nos dois casos, o prazo aparece **um ano depois** do correto, e o precatório cai na fila de priorização. Exatamente nos casos de fronteira (2 de abril, apresentação perto da meia-noite), o resultado depende do fuso, e nenhum documento define qual fuso vale.
 
-**Causa ou consequência.** Causa. O formato misto das datas e a falta de definição do fuso explicam o caso do `0056789`. O caso do `0012345` sugere comparação "antes de 2 de abril" em vez de "até 2 de abril", mas a diferença em relação ao `0045678` mostra que não é só isso. É preciso ver o código do cálculo.
+**Causa ou consequência.** Causa. O formato misto das datas e a falta de definição do fuso explicam o caso do `0056789`. O caso do `0012345` sugere comparação "antes de 2 de abril" em vez de "até 2 de abril", mas a diferença em relação ao `0045678` mostra que não é só isso. O código do cálculo não foi fornecido; a dúvida 22 pede para vê-lo.
 
 ### Alta
 
@@ -164,7 +174,7 @@ Em `apresentacoes.json`, as datas estão nas linhas 4, 8, 12, 16, 20 e 24, na or
 - `ev-006`, linhas 51–56: o mesmo processo, `valor` 5000, `data_pagamento` `2025-02-20`, `tipo` `pagamento`.
 - `schema.sql` linha 12: `CHECK (tipo IN ('pagamento', 'estorno'))`. O banco **prevê** estorno, com valor positivo (linha 13). A documentação diz que estorno não existe.
 
-**Impacto.** Há 5.000 lançados como pagamento e, no dia seguinte, 5.000 de estorno. O resultado correto provavelmente é 0 pago. Se o script só aceita `pagamento`, o estorno é ignorado (problema 2) e o precatório fica com 5.000 pagos. Se soma qualquer linha sem olhar o `tipo`, o total vai a 10.000. A operação não é avisada de qual dos dois caminhos ocorreu.
+**Impacto.** Há 5.000 lançados como pagamento e, no dia seguinte, 5.000 de estorno. O resultado correto provavelmente é 0 pago. O banco aceita o `estorno`, mas não se sabe o que o script faz com ele. Se o script só aceita `pagamento`, o estorno é ignorado (problema 2) e o precatório fica com 5.000 pagos. Se soma qualquer linha sem olhar o `tipo`, o total vai a 10.000. A operação não é avisada de qual dos dois caminhos ocorreu.
 
 **Causa ou consequência.** Causa: documentação desatualizada em relação ao banco e ao arquivo real. O `ev-006` cumpre o leiaute e só entra aqui por ser o pagamento que o estorno parece desfazer.
 
@@ -202,7 +212,7 @@ Em `apresentacoes.json`, as datas estão nas linhas 4, 8, 12, 16, 20 e 24, na or
 
 **Evidência.** `schema.sql` linha 3: `numero_processo CHAR(20) NOT NULL UNIQUE`. O formato CNJ da documentação (`NNNNNNN-DD.AAAA.J.TR.OOOO`) tem **25** caracteres; só os dígitos têm 20. `tribunal.csv` e quase todo `pagamentos.json` usam a máscara. `hub.csv` mistura os dois formatos (linha 3 sem máscara, as demais com).
 
-**Impacto.** O banco só aceita o número sem máscara. Se o script procura o precatório com o processo como veio do tribunal (com máscara), a busca não acha nada. O evento cai no problema 2, ou alguém remove a máscara à mão e de forma inconsistente, o que explicaria a linha 3 do hub.
+**Impacto.** O banco só aceita o número sem máscara. Não se sabe se o script remove a máscara antes de procurar o precatório. Se ele procura com o processo como veio do tribunal (com máscara), a busca não acha nada. O evento cai no problema 2, ou alguém remove a máscara à mão e de forma inconsistente, o que explicaria a linha 3 do hub.
 
 **Causa ou consequência.** Causa. Ajuda a explicar a mistura de formatos dos problemas 4 e 13.
 
@@ -291,7 +301,12 @@ A primeira ocorrência de `ev-001` (linhas 3–8) também segue o leiaute. Ela e
 
 ### Princípios
 
-Quatro regras orientam todas as mudanças abaixo. Cada uma ataca uma causa raiz do diagnóstico.
+As propostas estão em três frentes:
+
+- **Processo** e **banco:** mudanças sobre o que foi recebido, isto é, o fluxo descrito no enunciado e o `schema.sql`. O banco tem SQL pronto.
+- **Importação:** como o script não foi fornecido (ver [Limite da análise](#como-ler-este-documento)), não há alteração sobre um código existente. É uma proposta de como o processo de importação deveria funcionar, escrita a partir do comportamento descrito nos Passos 2 e 5. Ela vale tanto para corrigir o script atual quanto para escrever um novo.
+
+Quatro regras orientam as três frentes. Cada uma ataca uma causa raiz do diagnóstico.
 
 1. **O total pago é calculado a partir dos eventos, nunca acumulado.** O banco guarda um evento por `evento_id`, na versão mais recente. O total é uma consulta sobre esses eventos. Assim, importar o mesmo arquivo duas vezes não muda nada (problemas 1, 6 e 11).
 2. **Nada é descartado sem registro.** Todo evento que não pode ser importado vai para uma quarentena, com o registro original e o motivo, e alguém é avisado (problema 2).
@@ -300,7 +315,7 @@ Quatro regras orientam todas as mudanças abaixo. Cada uma ataca uma causa raiz 
 
 ### Problema e medida
 
-| # | Processo | Script de importação | Banco |
+| # | Processo | Importação (proposta) | Banco |
 |---|---|---|---|
 | 1 | Reprocessar passa a ser seguro | Uma transação por arquivo; upsert por `evento_id` | `UNIQUE (evento_id)`, `atualizado_em`, total por view |
 | 2 | Relatório diário de quarentena, com responsável | Toda recusa vira registro com motivo | Tabela `evento_rejeitado` |
@@ -320,26 +335,35 @@ Quatro regras orientam todas as mudanças abaixo. Cada uma ataca uma causa raiz 
 ### No processo
 
 - **Receber os arquivos sem passar pelo Excel.** O anexo é salvo automaticamente numa pasta de entrada (ou o tribunal envia por SFTP ou API) e registrado com hash antes de qualquer leitura. Se alguém precisar conferir, abre uma cópia ou o relatório gerado, nunca o original.
-- **Trocar a conciliação manual por um relatório.** O script compara a lista do tribunal com o sistema pelos dígitos do processo e pelo ente canônico. O relatório separa as divergências reais (só de um lado, valor de face diferente, ente diferente) das que eram só de escrita. A operação passa a tratar uma lista curta, e não a procurar texto.
+- **Trocar a conciliação manual por um relatório.** Um programa compara a lista do tribunal com o sistema pelos dígitos do processo e pelo ente canônico. O relatório separa as divergências reais (só de um lado, valor de face diferente, ente diferente) das que eram só de escrita. A operação passa a tratar uma lista curta, e não a procurar texto.
 - **Quarentena com dono.** Todo dia sai um relatório com os eventos recusados, o motivo e o registro original. Um responsável da operação decide, dentro de um prazo combinado, se o evento é corrigido, descartado ou devolvido ao tribunal. Nenhum evento fica parado sem decisão.
 - **Reprocessar sem medo.** Com a importação idempotente, rodar o mesmo arquivo de novo não altera os totais. O operador continua podendo reprocessar, e o sistema registra cada execução.
 - **Fechar o contrato com o tribunal.** Pedir uma versão 2.2 da documentação que trate o estorno, o valor negativo, a codificação, o separador, o fuso das datas e a regra de correção de um `evento_id`. Devolver ao tribunal, periodicamente, a lista do que foi recusado por quebra de leiaute.
 - **Avisar quando o prazo mudar.** A correção do cálculo muda a prioridade de alguns precatórios (problema 3). A equipe de carteira recebe a lista do que mudou antes da troca.
 
-### No script de importação
+### Na importação (proposta de processo)
+
+O script atual não foi fornecido. O que se sabe dele está no enunciado: ele soma cada valor ao total pago, é rodado de novo quando falha e ignora, sem aviso, o que não consegue importar. Os oito passos abaixo descrevem como a importação deveria funcionar para que os problemas do diagnóstico não voltem. Antes de implementar, é preciso comparar essa proposta com o código atual (dúvidas 22 e 23) para saber o que já existe e o que falta.
 
 1. **Registrar o arquivo antes de ler.** Calcular o SHA-256, gravar em `arquivo_recebido` com o conteúdo original e só depois interpretar.
-2. **Ler com regras explícitas.** O CSV é lido com codificação e separador declarados. Se o arquivo não estiver no leiaute, o script recusa o arquivo inteiro e avisa, em vez de adivinhar. Variantes conhecidas, como `"2.500,50"` e `10/04/2025`, só são convertidas se estiverem numa lista de exceções acordada com o tribunal, e o evento fica marcado como corrigido no relatório.
+2. **Ler com regras explícitas.** O CSV é lido com codificação e separador declarados. Se o arquivo não estiver no leiaute, a importação recusa o arquivo inteiro e avisa, em vez de adivinhar. Variantes conhecidas, como `"2.500,50"` e `10/04/2025`, só são convertidas se estiverem numa lista de exceções acordada com o tribunal, e o evento fica marcado como corrigido no relatório.
 3. **Validar campo a campo, contra o leiaute.** Cada evento passa por uma validação. O que falhar vai para `evento_rejeitado` com um motivo específico, como `valor_nulo`, `valor_negativo`, `processo_vazio`, `processo_invalido`, `precatorio_inexistente` ou `tipo_desconhecido`.
 4. **Normalizar antes de comparar.** O processo é reduzido aos 20 dígitos. O ente passa por uma tabela de nomes conhecidos. A data de apresentação é convertida para a data civil em `America/Sao_Paulo`, e uma data sem hora é tratada como data local.
 5. **Deduplicar dentro do arquivo.** Para cada `evento_id`, ficar com o registro de maior `atualizado_em`. Cópias idênticas viram uma só, e o relatório conta quantas foram descartadas.
 6. **Gravar numa transação por arquivo, com upsert.** Ou o arquivo entra inteiro, ou não entra nada. O upsert só substitui um evento quando o `atualizado_em` recebido é mais novo que o gravado.
-7. **Nunca somar no script.** O script grava eventos. O total pago e o prazo vêm das views do banco.
+7. **Nunca somar na importação.** A importação só grava eventos. O total pago e o prazo vêm das views do banco.
 8. **Terminar com um relatório e um código de saída.** O relatório traz quantos eventos foram lidos, inseridos, atualizados, ignorados por duplicata e mandados para a quarentena. Se houver quarentena, o código de saída é diferente de zero e o alerta é enviado.
 
 ### No banco (SQL)
 
 PostgreSQL, compatível com o `schema.sql` atual. É uma migração em cima das tabelas existentes, não uma recriação.
+
+O mesmo SQL está, pronto para rodar, em [`prevencao/migracao.sql`](../prevencao/migracao.sql). O arquivo roda numa transação única. Ele tem duas diferenças em relação aos trechos abaixo:
+
+- em vez de só listar os `evento_id` duplicados, a migração **para com erro** quando eles existem, para não criar a restrição sobre dados inconsistentes;
+- o upsert e a consulta de alerta ficam como comentário, porque são comandos da importação proposta e do relatório diário, e não parte da migração.
+
+Se um dos dois arquivos mudar, o outro precisa mudar junto.
 
 **1. Arquivos recebidos.** Guarda o original e o hash, para rastrear cada número até o arquivo de onde veio.
 
@@ -389,7 +413,7 @@ CREATE TABLE ente_devedor (
 );
 
 -- "MUNICIPIO DE SAO PAULO" e "Município de São Paulo" apontam para o mesmo ente.
--- O script grava o nome em maiúsculas e sem acento; um nome desconhecido vai para a quarentena.
+-- A importação proposta grava o nome em maiúsculas e sem acento; um nome desconhecido vai para a quarentena.
 CREATE TABLE ente_devedor_nome (
     nome_normalizado TEXT   PRIMARY KEY,
     ente_id          BIGINT NOT NULL REFERENCES ente_devedor (id)
@@ -406,7 +430,7 @@ ALTER TABLE precatorio
     ADD COLUMN apresentado_em_original TEXT,  -- "2025-04-03T01:00:00Z", como veio
     ADD COLUMN data_apresentacao       DATE;  -- convertida para America/Sao_Paulo
 
--- Conversão usada pelo script para valores com hora:
+-- Conversão que a importação proposta usa para valores com hora:
 --   ('2025-04-03T01:00:00Z'::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date  -> 2025-04-02
 
 -- Até 2 de abril (inclusive): 31/12 do ano seguinte. Depois: 31/12 do ano subsequente ao seguinte.
@@ -446,7 +470,7 @@ ALTER TABLE pagamento ADD CONSTRAINT pagamento_evento_id_unico UNIQUE (evento_id
 ALTER TABLE pagamento ALTER COLUMN atualizado_em SET NOT NULL;
 ```
 
-Comando que o script usa para gravar cada evento. Reimportar não duplica, e só uma versão mais nova substitui a gravada:
+Comando que a importação proposta usaria para gravar cada evento. Reimportar não duplica, e só uma versão mais nova substitui a gravada:
 
 ```sql
 INSERT INTO pagamento (precatorio_id, evento_id, tipo, valor, pago_em, atualizado_em, arquivo_id)
@@ -586,7 +610,11 @@ Perguntas a responder antes de pôr a limpeza em produção, agrupadas por quem 
 
 21. **[3, 10]** O `hub.csv` traz `apresentado_em` e `prazo_pagamento`, mas o `schema.sql` não tem essas colunas. De onde vêm esses dados? O `schema.sql` é o banco que gera o hub?
 22. **[3]** Onde está o código que calcula o prazo? É preciso entender por que `0012345` e `0045678`, os dois apresentados em 2 de abril, receberam prazos diferentes.
-23. **[10, 13]** Como o script de importação procura o precatório de um evento: pelo texto do processo como veio, ou pelos dígitos? Como os números com máscara cabem num `CHAR(20)`?
+23. **[2, 7, 10, 11, 13]** Podemos ver o código do script de importação atual? Ele não foi fornecido, e o diagnóstico precisou supor o comportamento dele. As perguntas principais são:
+    - ele procura o precatório pelo texto do processo como veio ou pelos dígitos?
+    - como ele converte valor e data fora do padrão?
+    - o que ele faz com `tipo` `estorno`?
+    - como os números com máscara caberiam num `CHAR(20)`?
 24. **[1]** Os arquivos de pagamento antigos estão guardados? Sem eles, não dá para refazer o total pago desde o início, só a partir de agora.
 
 ## Ajustes em relação ao texto bruto
