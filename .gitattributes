@@ -1,0 +1,2 @@
+# Arquivos do case: guardar exatamente como vieram, sem converter quebras de linha.
+case-candidato/** -text

@@ -27,7 +27,7 @@
 
 Quando um impacto depende de como o script foi escrito (por exemplo, como ele converte `"2.500,50"` ou procura o precatório), o texto diz isso e trata as alternativas como possibilidades. Pelo mesmo motivo, a parte da importação na [Prevenção](#prevenção) não é uma lista de alterações sobre um código existente. É uma proposta de como o processo de importação deveria funcionar. As perguntas sobre o código atual estão nas dúvidas 22 e 23.
 
-**Uso de IA.** A primeira versão (só `pagamentos.json`) foi formatada com IA a partir das anotações brutas, que estão no fim do documento. Nesta revisão, com apoio de IA, foram corrigidos os números de linha, incluído o `ev-004` (que estava nas notas de trabalho, mas tinha ficado de fora) e estendida a análise aos demais arquivos. Cada evidência foi conferida contra o arquivo original. As seções de Prevenção e Dúvidas também foram escritas com apoio de IA, a partir do diagnóstico.
+**Uso de IA.** A primeira versão (só `pagamentos.json`) foi formatada com IA a partir das anotações brutas, que estão no fim do documento. Nesta revisão, com apoio de IA, foram corrigidos os números de linha, incluído o `ev-004` (que estava nas anotações pessoais de trabalho, não versionadas, mas tinha ficado de fora) e estendida a análise aos demais arquivos. Cada evidência foi conferida contra o arquivo original. As seções de Prevenção e Dúvidas também foram escritas com apoio de IA, a partir do diagnóstico.
 
 ## Resumo
 
@@ -622,7 +622,7 @@ Perguntas a responder antes de pôr a limpeza em produção, agrupadas por quem 
 - Os itens 2 e 9 descrevem o mesmo registro (`ev-010`, processo vazio). Entraram como um problema só (15).
 - Os itens 4 e 7 descrevem o par `ev-006` / `ev-007`. O fato fica no problema 7. A pergunta sobre ignorar o `estorno` e somar só o `pagamento` fica nas Dúvidas.
 - No item 7, o evento com `tipo` `pagamento` é o `ev-006`. O `tipo` `estorno` é o `ev-007`. Os dois têm o processo `0034567-32.2018.8.26.0405`.
-- O `ev-004` (valor nulo) estava nas notas de trabalho, mas tinha ficado de fora do texto bruto e da primeira versão deste documento. Entrou como problema 12.
+- O `ev-004` (valor nulo) estava nas anotações pessoais de trabalho (não versionadas), mas tinha ficado de fora do texto bruto e da primeira versão deste documento. Entrou como problema 12.
 - Os números de linha da primeira versão foram corrigidos. Os campos `valor` e `data_pagamento` do `ev-002` e as datas do `ev-006` e do `ev-011` estavam uma linha abaixo da real.
 - A ordem da anotação foi reorganizada por gravidade, considerando todos os arquivos.
 
