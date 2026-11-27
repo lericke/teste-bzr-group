@@ -64,16 +64,16 @@ A frase da operação, "os números não batem", é a consequência somada desse
 
 ## Visão por precatório
 
-Prazo esperado: a regra do enunciado aplicada à data de apresentação, no horário de Brasília (ver problema 3).
+Prazo esperado: a regra do enunciado aplicada à data de apresentação, no horário de Brasília (ver problema 3). "Vencido" é em relação a 2026-11-26, data desta revisão.
 
 | Processo | `tribunal.csv` (linha · ente · face) | `hub.csv` (linha · ente · face) | Apresentado em | Prazo no hub | Prazo esperado | Eventos em `pagamentos.json` |
 |---|---|---|---|---|---|---|
 | `0012345-10.2019.8.26.0053` | 2 · Município de São Paulo · 45.000,00 | 2 · MUNICIPIO DE SAO PAULO · 45000.00 | 2025-04-02 | 2027-12-31 ❌ | 2026-12-31 | `ev-001` (×2), `ev-002` (×2) |
 | `0023456-21.2020.8.26.0053` | 3 · Município de São Paulo · 30.000,00 | 3 · **sem máscara** · Município de São Paulo · **31000.00** | 2025-04-03 | 2027-12-31 | 2027-12-31 | `ev-003`, `ev-004`, `ev-005` (sem máscara) |
-| `0034567-32.2018.8.26.0405` | 4 · Estado de São Paulo · 12.500,00 | 4 · Estado de São Paulo · 12500.00 | 2024-02-29 | 2025-12-31 | 2025-12-31 | `ev-006`, `ev-007` (estorno) |
+| `0034567-32.2018.8.26.0405` | 4 · Estado de São Paulo · 12.500,00 | 4 · Estado de São Paulo · 12500.00 | 2024-02-29 | 2025-12-31 | 2025-12-31 (**vencido**) | `ev-006`, `ev-007` (estorno) |
 | `0045678-43.2021.5.02.0011` | 5 · **União** · 9.800,00 | 5 · **Município de Santos** · 9800.00 | 2025-04-02T23:30:00-03:00 | 2026-12-31 | 2026-12-31 | `ev-008` |
 | `0056789-54.2017.4.03.6100` | **não existe** | 6 · Estado de São Paulo · 22000.00 | 2025-04-03T01:00:00Z | 2027-12-31 ❌ | 2026-12-31 | `ev-009` (negativo) |
-| `0067890-65.2016.8.26.0053` | 6 · Município de São Paulo · 7.000,00 | **não existe** | 2023-12-31 | — | 2024-12-31 (**vencido**) | `ev-011` |
+| `0067890-65.2016.8.26.0053` | 6 · Município de São Paulo · 7.000,00 | **não existe** | 2023-12-31 | — | 2025-12-31 (**vencido**) | `ev-011` |
 | *(vazio)* | — | — | — | — | — | `ev-010` |
 
 Em `apresentacoes.json`, as datas estão nas linhas 4, 8, 12, 16, 20 e 24, na ordem da tabela.
@@ -149,7 +149,7 @@ Em `apresentacoes.json`, as datas estão nas linhas 4, 8, 12, 16, 20 e 24, na or
 
 **Impacto.**
 
-- `0067890`: apresentado em 2023-12-31, o prazo seria **2024-12-31**. O precatório já está vencido e não aparece na carteira, então não entra na priorização. Como `precatorio_id` é obrigatório (`schema.sql` linha 10), o pagamento de 4.000 do `ev-011` não tem onde ser gravado e cai no problema 2.
+- `0067890`: apresentado em 2023-12-31, depois de 2 de abril de 2023, então o prazo é **2025-12-31**. O precatório já está vencido e não aparece na carteira, então não entra na priorização. Como `precatorio_id` é obrigatório (`schema.sql` linha 10), o pagamento de 4.000 do `ev-011` não tem onde ser gravado e cai no problema 2.
 - `0056789`: o sistema acompanha um precatório de 22.000 que o tribunal não lista. Pode ser precatório já quitado, cancelado ou fora do recorte do tribunal. É também o processo do valor negativo (problema 14).
 
 **Causa ou consequência.** Causa. A conciliação por texto (problema 4) não deixa claro se a ausência é real ou se é só diferença de escrita.
@@ -294,7 +294,7 @@ A primeira ocorrência de `ev-001` (linhas 3–8) também segue o leiaute. Ela e
 **Observações que não foram tratadas como problema.**
 
 - Valores inteiros (`8000`, `5000`, `3000`, `4000`, `750`) são números JSON válidos. A documentação pede ponto decimal; um inteiro sem casa decimal continua sendo número.
-- `0034567-32.2018.8.26.0405` foi apresentado em `2024-02-29`. A data existe (2024 é bissexto) e o prazo do hub, `2025-12-31`, está correto. Vale como caso de teste.
+- `0034567-32.2018.8.26.0405` foi apresentado em `2024-02-29`. A data existe (2024 é bissexto) e o prazo do hub, `2025-12-31`, está correto. Vale como caso de teste. O prazo já venceu, e o precatório tem pagamento de 5.000 de um valor de face de 12.500; isso é situação da carteira, não defeito de dado.
 - Os dígitos verificadores (`DD`) de nenhum dos seis processos passam no cálculo do CNJ (módulo 97). Como o enunciado avisa que os processos são fictícios, isso não foi tratado como defeito, mas a validação não deve entrar como regra de descarte sem confirmar com a operação.
 
 ## Prevenção
@@ -603,7 +603,7 @@ Perguntas a responder antes de pôr a limpeza em produção, agrupadas por quem 
 16. **[1]** Quantas vezes, em média, um arquivo é reprocessado? Existe registro disso? A resposta permite estimar quanto os totais atuais estão inflados.
 17. **[2]** Quem deve receber o relatório diário de eventos recusados, e em quanto tempo eles precisam ser tratados?
 18. **[9]** Quando o operador abre o `tribunal.csv` no Excel, ele salva por cima do anexo? O anexo original dos e-mails anteriores ainda existe?
-19. **[5]** Por que o `0067890-65.2016.8.26.0053` não está no hub? Ele nunca foi cadastrado, ou foi removido? Pelo enunciado, o prazo venceu em 2024-12-31: a equipe sabe disso?
+19. **[5]** Por que o `0067890-65.2016.8.26.0053` não está no hub? Ele nunca foi cadastrado, ou foi removido? Pela regra do enunciado, o prazo venceu em 2025-12-31: a equipe sabe disso?
 20. **[3]** Quem precisa ser avisado quando a correção do cálculo mudar o prazo, e portanto a prioridade, de um precatório?
 
 ### Para quem mantém o sistema
